@@ -2,10 +2,14 @@ package com.auth0.react;
 
 import android.app.Activity;
 import android.content.Intent;
+import android.content.pm.PackageManager;
+import android.content.pm.ResolveInfo;
 import android.net.Uri;
 import android.os.Handler;
 import androidx.annotation.NonNull;
 import androidx.browser.customtabs.CustomTabsIntent;
+import androidx.browser.customtabs.CustomTabsService;
+
 import android.util.Base64;
 
 import com.facebook.react.bridge.Arguments;
@@ -20,7 +24,9 @@ import java.io.UnsupportedEncodingException;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 public class A0Auth0Module extends ReactContextBaseJavaModule implements LifecycleEventListener {
@@ -52,12 +58,18 @@ public class A0Auth0Module extends ReactContextBaseJavaModule implements Lifecyc
     @ReactMethod
     public void showUrl(String url, boolean closeOnLoad, Callback callback) {
         final Activity activity = getCurrentActivity();
-
         this.callback = callback;
         if (activity != null) {
-            CustomTabsIntent.Builder builder = new CustomTabsIntent.Builder();
-            CustomTabsIntent customTabsIntent = builder.build();
-            customTabsIntent.launchUrl(activity, Uri.parse(url));
+            if (this.hasBrowserSupport()) {
+                CustomTabsIntent.Builder builder = new CustomTabsIntent.Builder();
+                CustomTabsIntent customTabsIntent = builder.build();
+                customTabsIntent.launchUrl(activity, Uri.parse(url));
+            } else {
+                final Intent intent = new Intent(Intent.ACTION_VIEW);
+                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                intent.setData(Uri.parse(url));
+                getReactApplicationContext().startActivity(intent);
+            }
         } else {
             final Intent intent = new Intent(Intent.ACTION_VIEW);
             intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
@@ -146,5 +158,32 @@ public class A0Auth0Module extends ReactContextBaseJavaModule implements Lifecyc
     @Override
     public void onHostDestroy() {
         // NO OP
+    }
+
+    /// check if current device has browser or has browser that support Custom Tabs service.
+    private boolean hasBrowserSupport() {
+        PackageManager pm = reactContext.getPackageManager();
+        // Get default view intent handler
+        Intent activityIntent = new Intent().
+                setAction(Intent.ACTION_VIEW).
+                addCategory(Intent.CATEGORY_BROWSABLE).
+                setData(Uri.fromParts("http", "", null));
+
+        // Get all apps that can handle VIEW intents
+        List<ResolveInfo> resolveInfoList = pm.queryIntentActivities(activityIntent, 0);
+        if (resolveInfoList.size() > 0) {
+            ArrayList<ResolveInfo> packagesSupportingCustomTabs = new ArrayList<>();
+            for (ResolveInfo info: resolveInfoList) {
+                Intent serviceIntent = new Intent();
+                serviceIntent.setAction(CustomTabsService.ACTION_CUSTOM_TABS_CONNECTION);
+                serviceIntent.setPackage(info.activityInfo.packageName);
+                // Check if this package also resolves the Custom Tabs service.
+                if (pm.resolveService(serviceIntent, 0) != null) {
+                    packagesSupportingCustomTabs.add(info);
+                }
+            }
+            return packagesSupportingCustomTabs.size() > 0;
+        }
+        return false;
     }
 }
