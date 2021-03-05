@@ -59,8 +59,8 @@ public class A0Auth0Module extends ReactContextBaseJavaModule implements Lifecyc
     public void showUrl(String url, boolean closeOnLoad, Callback callback) {
         final Activity activity = getCurrentActivity();
         this.callback = callback;
-        if (activity != null) {
-            if (this.hasBrowserSupport()) {
+        try {
+            if (activity != null && this.hasBrowserSupport()) {
                 CustomTabsIntent.Builder builder = new CustomTabsIntent.Builder();
                 CustomTabsIntent customTabsIntent = builder.build();
                 customTabsIntent.launchUrl(activity, Uri.parse(url));
@@ -70,11 +70,8 @@ public class A0Auth0Module extends ReactContextBaseJavaModule implements Lifecyc
                 intent.setData(Uri.parse(url));
                 getReactApplicationContext().startActivity(intent);
             }
-        } else {
-            final Intent intent = new Intent(Intent.ACTION_VIEW);
-            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-            intent.setData(Uri.parse(url));
-            getReactApplicationContext().startActivity(intent);
+        } catch (Exception e) {
+            e.printStackTrace();
         }
     }
 
